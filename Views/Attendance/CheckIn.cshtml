@@ -1,0 +1,133 @@
+@model 課堂打卡系統.ViewModels.CheckInPageViewModel
+@{
+    ViewData["Title"] = "課堂打卡";
+}
+
+<div class="page-backlink">
+    <a asp-controller="Attendance" asp-action="Index">返回課堂總覽</a>
+</div>
+
+<section class="checkin-layout">
+    <article class="content-card content-card--primary">
+        <p class="eyebrow">@Model.CourseCode</p>
+        <h1 class="section-title">@Model.CourseName</h1>
+        <p class="checkin-topic">@Model.Topic</p>
+
+        <dl class="detail-list">
+            <div>
+                <dt>教師</dt>
+                <dd>@Model.TeacherName</dd>
+            </div>
+            <div>
+                <dt>教室</dt>
+                <dd>@Model.Classroom</dd>
+            </div>
+            <div>
+                <dt>時間</dt>
+                <dd>@Model.StartAt.ToString("yyyy/MM/dd HH:mm") - @Model.EndAt.ToString("HH:mm")</dd>
+            </div>
+            <div>
+                <dt>狀態</dt>
+                <dd class="@(Model.IsOpen ? "text-success" : "text-danger")">@(Model.IsOpen ? "開放打卡中" : "已關閉打卡")</dd>
+            </div>
+            <div>
+                <dt>來源網路</dt>
+                <dd class="@(Model.IsWithinAllowedNetwork ? "text-success" : "text-warning")">
+                    @(Model.IsWithinAllowedNetwork ? $"符合 {Model.ExpectedSsidLabel} 網段" : $"未連上 {Model.ExpectedSsidLabel} 允許網段")
+                </dd>
+            </div>
+            <div>
+                <dt>QR 驗證</dt>
+                <dd class="@(Model.IsQrValidated ? "text-success" : "text-danger")">
+                    @(Model.IsQrValidated ? $"有效至 {Model.QrExpiresAtLocal:HH:mm:ss}" : "未通過")
+                </dd>
+            </div>
+        </dl>
+    </article>
+
+    <article class="content-card">
+        <h2 class="section-title">本人打卡</h2>
+
+        @if (TempData["StatusMessage"] is string statusMessage)
+        {
+            <div class="alert alert-success" role="status">@statusMessage</div>
+        }
+
+        @if (TempData["ErrorMessage"] is string errorMessage)
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.AccessError))
+        {
+            <div class="alert @(Model.CanCheckIn ? "alert-warning" : "alert-danger")" role="alert">@Model.AccessError</div>
+        }
+
+        <div class="identity-card">
+            <h3>已登入學生</h3>
+            <p><strong>@Model.StudentName</strong></p>
+            <p>@Model.StudentNumber</p>
+            <p class="identity-card__hint">打卡學號與姓名由登入帳號帶入，無法手動修改。</p>
+        </div>
+
+        <form asp-controller="Attendance" asp-action="CheckIn" method="post" class="checkin-form" novalidate>
+            @Html.AntiForgeryToken()
+            <input asp-for="Form.SessionId" type="hidden" />
+            <input asp-for="Form.Token" type="hidden" />
+
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+            <div class="mb-3">
+                <label asp-for="Form.Note" class="form-label"></label>
+                <input asp-for="Form.Note" class="form-control" autocomplete="off" />
+                <span asp-validation-for="Form.Note" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" disabled="@(!Model.CanCheckIn)">送出本人打卡</button>
+        </form>
+    </article>
+</section>
+
+<section class="content-card">
+    <div class="recent-list__header">
+        <h2 class="section-title">本堂已打卡名單</h2>
+        <span>@Model.Records.Count 人</span>
+    </div>
+
+    @if (Model.Records.Count == 0)
+    {
+        <p class="empty-text">尚未有學生完成打卡。</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table attendance-table">
+                <thead>
+                    <tr>
+                        <th scope="col">學號</th>
+                        <th scope="col">姓名</th>
+                        <th scope="col">打卡時間</th>
+                        <th scope="col">可疑註記</th>
+                        <th scope="col">備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in Model.Records)
+                    {
+                        <tr class="@(record.IsSuspicious ? "table-warning" : null)">
+                            <td>@record.StudentNumber</td>
+                            <td>@record.StudentName</td>
+                            <td>@record.CheckedInAt.ToString("yyyy/MM/dd HH:mm:ss")</td>
+                            <td>@(record.IsSuspicious ? record.SuspiciousReasonSummary : "無")</td>
+                            <td>@(string.IsNullOrWhiteSpace(record.Note) ? "無" : record.Note)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
